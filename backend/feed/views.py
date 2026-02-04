@@ -27,9 +27,24 @@ def post_comments(request, post_id):
     comments = (
         Comment.objects
         .filter(post_id=post_id)
-        .select_related("author")  
+        .select_related("author")
         .order_by("created_at")
     )
 
-    serializer = CommentSerializer(comments, many=True)
+    comment_map = {}
+    root_comments = []
+
+    for comment in comments:
+        comment.children = []
+        comment_map[comment.id] = comment
+
+    for comment in comments:
+        if comment.parent_id:
+            parent = comment_map.get(comment.parent_id)
+            if parent:
+                parent.children.append(comment)
+        else:
+            root_comments.append(comment)
+
+    serializer = CommentSerializer(root_comments, many=True)
     return Response(serializer.data)

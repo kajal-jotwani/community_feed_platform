@@ -11,7 +11,7 @@ class PostSerializer(serializers.ModelSerializer):
 
 class CommentSerializer(serializers.ModelSerializer):
     author = serializers.CharField(source="author.username", read_only=True)
-    parent_id = serializers.IntegerField(read_only=True)
+    children = serializers.SerializerMethodField()
 
     class Meta:
         model = Comment
@@ -19,6 +19,10 @@ class CommentSerializer(serializers.ModelSerializer):
             "id",
             "author",
             "content",
-            "parent_id",
             "created_at",
+            "children",
         ]
+
+    def get_children(self, obj):
+        return CommentSerializer(obj.children, many=True).data
+

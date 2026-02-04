@@ -8,3 +8,6 @@ venv/
 .git
 .gitignore
 node_modules/
+
+# Frontend Docker build: exclude backend
+backend/

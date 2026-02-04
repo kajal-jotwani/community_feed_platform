@@ -85,11 +85,12 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 
 import dj_database_url
 
+_db_ssl = os.getenv("DATABASE_SSL", "true").lower() == "true"
 DATABASES = {
     "default": dj_database_url.parse(
-        os.getenv("DATABASE_URL"),
+        os.getenv("DATABASE_URL", "sqlite:///db.sqlite3"),
         conn_max_age=600,
-        ssl_require=True,
+        ssl_require=_db_ssl,
     )
 }
 

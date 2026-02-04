@@ -15,12 +15,12 @@ export const Feed: React.FC = () => {
     loadPosts();
   }, [loadPosts]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newPostContent.trim()) {
-      addPost(newPostContent, currentUser);
-      setNewPostContent('');
-    }
+    const content = newPostContent.trim();
+    if (!content) return;
+    await addPost(content, currentUser);
+    setNewPostContent('');
   };
 
   if (isLoading && posts.length === 0) {

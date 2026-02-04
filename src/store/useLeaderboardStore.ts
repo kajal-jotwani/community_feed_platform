@@ -1,17 +1,23 @@
 import { create } from 'zustand';
 import type { LeaderboardEntry } from '../types';
-import { fetchLeaderboard } from '../services/leaderboardService';
+import { fetchLeaderboard, fetchLeaderboardFull } from '../services/leaderboardService';
 
 interface LeaderboardState {
   entries: LeaderboardEntry[];
+  fullEntries: LeaderboardEntry[];
   isLoading: boolean;
+  fullListOpen: boolean;
   loadLeaderboard: () => Promise<void>;
+  loadLeaderboardFull: () => Promise<void>;
+  setFullListOpen: (open: boolean) => void;
 }
 
 export const useLeaderboardStore = create<LeaderboardState>((set) => ({
   entries: [],
+  fullEntries: [],
   isLoading: false,
-  
+  fullListOpen: false,
+
   loadLeaderboard: async () => {
     set({ isLoading: true });
     try {
@@ -22,4 +28,15 @@ export const useLeaderboardStore = create<LeaderboardState>((set) => ({
       set({ isLoading: false });
     }
   },
+
+  loadLeaderboardFull: async () => {
+    try {
+      const fullEntries = await fetchLeaderboardFull();
+      set({ fullEntries, fullListOpen: true });
+    } catch (error) {
+      console.error('Failed to load full leaderboard:', error);
+    }
+  },
+
+  setFullListOpen: (open) => set({ fullListOpen: open }),
 }));

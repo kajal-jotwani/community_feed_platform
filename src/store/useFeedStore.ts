@@ -1,6 +1,13 @@
 import { create } from 'zustand';
 import type { Post, Comment, UserSummary } from '../types';
-import { fetchPosts, fetchPostComments, likePostApi, likeCommentApi } from '../services/feedService';
+import {
+  fetchPosts,
+  fetchPostComments,
+  likePostApi,
+  likeCommentApi,
+  createPostApi,
+  createCommentApi,
+} from '../services/feedService';
 
 interface FeedState {
   posts: Post[];
@@ -10,8 +17,8 @@ interface FeedState {
   loadPostComments: (postId: number) => Promise<void>;
   likePost: (postId: number) => Promise<void>;
   likeComment: (postId: number, commentId: number) => Promise<void>;
-  addPost: (content: string, author: UserSummary) => void;
-  addComment: (postId: number, parentId: number | null, content: string, author: UserSummary) => void;
+  addPost: (content: string, author: UserSummary) => Promise<void>;
+  addComment: (postId: number, parentId: number | null, content: string, author: UserSummary) => Promise<void>;
 }
 
 export const useFeedStore = create<FeedState>((set, get) => ({
@@ -158,60 +165,127 @@ export const useFeedStore = create<FeedState>((set, get) => ({
     }
   },
   
-  addPost: (content: string, author: UserSummary) => {
-    const newPost: Post = {
-      id: Date.now(), // Temporary ID
+  addPost: async (content: string, author: UserSummary) => {
+    const ts = new Date().toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    const tempPost: Post = {
+      id: -1,
       author,
       content,
-      timestamp: new Date().toLocaleString(undefined, {
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      }),
+      timestamp: ts,
       likes: 0,
       likedByMe: false,
       comments: [],
       hasLoadedComments: false,
     };
-    set({ posts: [newPost, ...get().posts] });
+    set({ posts: [tempPost, ...get().posts] });
+    try {
+      const created = await createPostApi(content);
+      const newPost: Post = {
+        id: created.id,
+        author: {
+          name: created.author,
+          avatar: `https://api.dicebear.com/9.x/identicon/svg?seed=${encodeURIComponent(created.author || 'user')}`,
+        },
+        content: created.content,
+        timestamp: new Date(created.created_at).toLocaleString(undefined, {
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+        likes: created.like_count ?? 0,
+        likedByMe: false,
+        comments: [],
+        hasLoadedComments: false,
+      };
+      set({
+        posts: get().posts.map((p) => (p.id === -1 ? newPost : p)),
+      });
+    } catch (e) {
+      set({ posts: get().posts.filter((p) => p.id !== -1) });
+      console.error('Failed to create post:', e);
+    }
   },
-  
-  addComment: (postId: number, parentId: number | null, content: string, author: UserSummary) => {
+
+  addComment: async (postId: number, parentId: number | null, content: string, author: UserSummary) => {
     const { posts } = get();
+    const formatTs = (iso: string) => {
+      try {
+        return new Date(iso).toLocaleString(undefined, {
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+      } catch {
+        return iso;
+      }
+    };
+    const mapU = (username: string): UserSummary => ({
+      name: username,
+      avatar: `https://api.dicebear.com/9.x/identicon/svg?seed=${encodeURIComponent(username || 'user')}`,
+    });
     const newComment: Comment = {
-      id: Date.now(), // Temporary ID
+      id: -1,
       author,
       content,
-      timestamp: new Date().toLocaleString(undefined, {
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      }),
+      timestamp: formatTs(new Date().toISOString()),
       likes: 0,
       likedByMe: false,
       replies: [],
     };
-    
-    const addCommentToTree = (comments: Comment[]): Comment[] => {
-      if (parentId === null) {
-        return [...comments, newComment];
-      }
+    const addToTree = (comments: Comment[]): Comment[] => {
+      if (parentId === null) return [...comments, newComment];
       return comments.map((c) => {
-        if (c.id === parentId) {
-          return { ...c, replies: [...c.replies, newComment] };
-        }
-        return { ...c, replies: addCommentToTree(c.replies) };
+        if (c.id === parentId) return { ...c, replies: [...c.replies, newComment] };
+        return { ...c, replies: addToTree(c.replies) };
       });
     };
-    
     set({
       posts: posts.map((p) =>
-        p.id === postId
-          ? { ...p, comments: addCommentToTree(p.comments) }
-          : p
+        p.id === postId ? { ...p, comments: addToTree(p.comments) } : p
       ),
     });
+    try {
+      const created = await createCommentApi(postId, content, parentId);
+      const persisted: Comment = {
+        id: created.id,
+        author: mapU(created.author),
+        content: created.content,
+        timestamp: formatTs(created.created_at),
+        likes: 0,
+        likedByMe: false,
+        replies: (created.children ?? []).map((ch) => ({
+          id: ch.id,
+          author: mapU(ch.author),
+          content: ch.content,
+          timestamp: formatTs(ch.created_at),
+          likes: 0,
+          likedByMe: false,
+          replies: [],
+        })),
+      };
+      const replaceTemp = (comments: Comment[]): Comment[] =>
+        comments.map((c) => (c.id === -1 ? persisted : { ...c, replies: replaceTemp(c.replies) }));
+      set({
+        posts: get().posts.map((p) =>
+          p.id === postId ? { ...p, comments: replaceTemp(p.comments) } : p
+        ),
+      });
+    } catch (e) {
+      set({
+        posts: get().posts.map((p) =>
+          p.id === postId
+            ? { ...p, comments: p.comments.filter((c) => c.id !== -1) }
+            : p
+        ),
+      });
+      console.error('Failed to create comment:', e);
+    }
   },
 }));

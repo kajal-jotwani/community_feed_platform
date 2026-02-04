@@ -12,8 +12,7 @@ const avatarForName = (name: string): string => {
   return `https://api.dicebear.com/9.x/identicon/svg?seed=${safe}`;
 };
 
-export async function fetchLeaderboard(): Promise<LeaderboardEntry[]> {
-  const data = await get<ApiLeaderboardItem[]>('/leaderboard/');
+function mapLeaderboardData(data: ApiLeaderboardItem[]): LeaderboardEntry[] {
   return data.map((item, index) => ({
     rank: index + 1,
     user: {
@@ -25,3 +24,12 @@ export async function fetchLeaderboard(): Promise<LeaderboardEntry[]> {
   }));
 }
 
+export async function fetchLeaderboard(): Promise<LeaderboardEntry[]> {
+  const data = await get<ApiLeaderboardItem[]>('/leaderboard/');
+  return mapLeaderboardData(data);
+}
+
+export async function fetchLeaderboardFull(): Promise<LeaderboardEntry[]> {
+  const data = await get<ApiLeaderboardItem[]>('/leaderboard/full/');
+  return mapLeaderboardData(data);
+}

@@ -120,3 +120,47 @@ def leaderboard(request):
 
     return Response(top_users)
 
+
+@api_view(["GET"])
+def leaderboard_full(request):
+    since = timezone.now() - timedelta(hours=24)
+
+    all_users = (
+        KarmaEvent.objects
+        .filter(created_at__gte=since)
+        .values("user__id", "user__username")
+        .annotate(total_karma=Sum("points"))
+        .order_by("-total_karma")
+    )
+
+    return Response(list(all_users))
+
+
+@api_view(["POST"])
+def post_create(request):
+    user = User.objects.first()
+    content = request.data.get("content", "").strip()
+    if not content:
+        return Response({"detail": "content is required"}, status=400)
+    post = Post.objects.create(author=user, content=content)
+    serializer = PostSerializer(post)
+    return Response(serializer.data, status=201)
+
+
+@api_view(["POST"])
+def comment_create(request, post_id):
+    user = User.objects.first()
+    post = get_object_or_404(Post, id=post_id)
+    content = request.data.get("content", "").strip()
+    parent_id = request.data.get("parent_id")
+    if not content:
+        return Response({"detail": "content is required"}, status=400)
+    parent = None
+    if parent_id is not None:
+        parent = get_object_or_404(Comment, id=parent_id)
+    comment = Comment.objects.create(
+        post=post, author=user, content=content, parent=parent
+    )
+    serializer = CommentSerializer(comment)
+    return Response(serializer.data, status=201)
+

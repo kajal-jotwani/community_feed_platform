@@ -34,3 +34,32 @@ body::before {
   background: #d1d5db;
   border-radius: 10px;
 }
+
+/* Fun background animation */
+@keyframes float-slow {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(15px, -20px) scale(1.05); }
+  66% { transform: translate(-10px, 10px) scale(0.95); }
+}
+
+@keyframes float-slower {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  50% { transform: translate(-20px, -15px) rotate(5deg); }
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 0.15; }
+  50% { opacity: 0.25; }
+}
+
+.bg-float-slow {
+  animation: float-slow 12s ease-in-out infinite;
+}
+
+.bg-float-slower {
+  animation: float-slower 18s ease-in-out infinite;
+}
+
+.bg-pulse-soft {
+  animation: pulse-soft 8s ease-in-out infinite;
+}

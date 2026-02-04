@@ -79,3 +79,17 @@ export async function likeCommentApi(commentId: number): Promise<void> {
   await post(`/comments/${commentId}/like/`);
 }
 
+export async function createPostApi(content: string): Promise<ApiPost> {
+  return post<ApiPost>('/posts/create/', { content });
+}
+
+export async function createCommentApi(
+  postId: number,
+  content: string,
+  parentId: number | null
+): Promise<ApiComment> {
+  return post<ApiComment>(`/posts/${postId}/comments/create/`, {
+    content,
+    parent_id: parentId,
+  });
+}

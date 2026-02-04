@@ -1,5 +1,7 @@
 from django.shortcuts import render
-from django.db.models import Count
+from django.db.models import Count, Sum
+from django.utils import timezone
+from datetime import timedelta
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from django.db import transaction, IntegrityError
@@ -103,3 +105,18 @@ def like_comment(request, comment_id):
         )
 
     return Response({"detail": "Comment liked successfully"})
+
+@api_view(["GET"])
+def leaderboard(request):
+    since = timezone.now() - timedelta(hours=24)
+
+    top_users = (
+        KarmaEvent.objects
+        .filter(created_at__gte=since)
+        .values("user__id", "user__username")
+        .annotate(total_karma=Sum("points"))
+        .order_by("-total_karma")[:5]
+    )
+
+    return Response(top_users)
+
